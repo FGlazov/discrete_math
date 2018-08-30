@@ -1,5 +1,4 @@
 use std::iter::Iterator;
-use std::collections::HashMap;
 use std::collections::HashSet;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -8,6 +7,7 @@ use std::iter::FromIterator;
 fn main() {
     println!("Hello, world!");
     projective_plane_find(2);
+    println!("Done world!")
 }
 
 // A point in a projective plane, or in a struct which is being built to a projective plane.
@@ -57,13 +57,13 @@ impl<'a> Plane<'a> {
         let mut result = HashSet::new();
         for point in &self.points {
             let mut points_in_line = Vec::with_capacity((self.order + 1) as usize);
-            points_in_line.push(&point);
+            points_in_line.push(point);
 
-            let mut allowed_points = self.points.clone();
-            allowed_points.remove(&point);
+            let mut allowed_points: HashSet<&Point> = self.points.iter().collect();
+            allowed_points.remove(point);
 
             for line in &self.lines {
-                if line.has_point(&point) {
+                if line.has_point(point) {
                     for point in &line.points {
                         allowed_points.remove(point);
                     }
@@ -71,8 +71,17 @@ impl<'a> Plane<'a> {
             }
 
             for allowed_point in &allowed_points {
-                let allowed_points_clone = allowed_points.clone();
-                let points_in_line_clone = points_in_line.clone();
+                let mut allowed_points_clone: HashSet<&Point> = allowed_points.clone();
+                let mut points_in_line_clone = points_in_line.clone();
+
+                allowed_points_clone.remove(allowed_point);
+                points_in_line_clone.push(allowed_point);
+
+                let lines = find_line_candidates(self, points_in_line_clone, allowed_points_clone);
+
+                for line in lines {
+                    result.insert(line);
+                }
             }
         }
 
@@ -80,12 +89,14 @@ impl<'a> Plane<'a> {
     }
 }
 
-fn find_line_candidates<'a>(plane: &'a Plane, points_in_line: Vec<&Point>, allowed_points: HashSet<&Point>) -> HashSet<Line<'a>> {
+fn find_line_candidates<'plane>(plane: &'plane Plane, points_in_line: Vec<&'plane Point>, allowed_points: HashSet<&'plane Point>) -> HashSet<Line<'plane>> {
     let mut allowed_points = allowed_points;
 
     if points_in_line.len() == (plane.order + 1) as usize {
-        let set_of_points: HashSet<&Point> = HashSet::with_capacity((plane.order + 1) as usize);
-        let line = Line { points : set_of_points};
+        let mut set_of_points: HashSet<&'plane Point> = HashSet::from_iter(points_in_line);
+
+        let line = Line { points: set_of_points };
+
         let mut result = HashSet::with_capacity(1);
         result.insert(line);
         return result;
@@ -133,4 +144,8 @@ fn new_plane<'a>(order: u32) -> Plane<'a> {
     }
 }
 
-fn projective_plane_find(order: u32) {}
+fn projective_plane_find(order: u32) {
+    let plane = new_plane(order);
+    let lines = plane.find_all_line_candidates();
+    println!("{:?}", lines)
+}
