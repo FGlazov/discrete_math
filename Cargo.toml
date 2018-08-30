@@ -1,0 +1,6 @@
+[package]
+name = "discrete_math"
+version = "0.1.0"
+authors = ["Fedor Glazov <fedorglazov@gmail.com>"]
+
+[dependencies]
