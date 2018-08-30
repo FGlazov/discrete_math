@@ -11,13 +11,13 @@ fn main() {
 }
 
 // A point in a projective plane, or in a struct which is being built to a projective plane.
-#[derive(Hash, Eq, PartialEq, Debug, Clone)]
+#[derive(Hash, Eq, PartialEq, Debug, Clone, Copy)]
 struct Point {
     id: u32
 }
 
 // A line in a projective plane, or in a struct which is being built to a projective plane
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug, Clone)]
 struct Line<'a> {
     points: HashSet<&'a Point>
 }
@@ -43,7 +43,7 @@ impl<'a> Hash for Line<'a> {
 struct Plane<'a> {
     lines: HashSet<Line<'a>>,
     points: HashSet<Point>,
-    order: u32
+    order: u32,
 }
 
 impl<'a> Plane<'a> {
@@ -70,27 +70,52 @@ impl<'a> Plane<'a> {
                 }
             }
 
-            for allowed_point in allowed_points {}
+            for allowed_point in &allowed_points {
+                let allowed_points_clone = allowed_points.clone();
+                let points_in_line_clone = points_in_line.clone();
+            }
         }
 
         result
     }
 }
 
-fn find_line_candidates<'a>(plane: &'a Plane, points_in_line: &'a Vec<Point>) -> HashSet<Line<'a>> {
-    if points_in_line.len() == (plane.order + 1) as usize {
-        let mut points = HashSet::with_capacity((plane.order + 1) as usize);
-        for point in points_in_line {
-            points.insert(point);
-        }
-        let line = Line { points };
+fn find_line_candidates<'a>(plane: &'a Plane, points_in_line: Vec<&Point>, allowed_points: HashSet<&Point>) -> HashSet<Line<'a>> {
+    let mut allowed_points = allowed_points;
 
+    if points_in_line.len() == (plane.order + 1) as usize {
+        let set_of_points: HashSet<&Point> = HashSet::with_capacity((plane.order + 1) as usize);
+        let line = Line { points : set_of_points};
         let mut result = HashSet::with_capacity(1);
         result.insert(line);
         return result;
     }
 
-    HashSet::new()
+    let point_to_check = points_in_line.last().unwrap();
+    for line in &plane.lines {
+        if line.has_point(point_to_check) {
+            for point in &line.points {
+                allowed_points.remove(point);
+            }
+        }
+    }
+
+    let mut result = HashSet::new();
+    for allowed_point in allowed_points.iter() {
+        let mut allowed_points_clone = allowed_points.clone();
+        let mut points_in_line_clone: Vec<&Point> = points_in_line.clone();
+
+        allowed_points_clone.remove(allowed_point);
+        points_in_line_clone.push(allowed_point);
+
+        let lines = find_line_candidates(plane, points_in_line_clone, allowed_points_clone);
+
+        for line in lines {
+            result.insert(line);
+        }
+    }
+
+    result
 }
 
 fn new_plane<'a>(order: u32) -> Plane<'a> {
@@ -104,7 +129,7 @@ fn new_plane<'a>(order: u32) -> Plane<'a> {
     Plane {
         lines: HashSet::with_capacity(cardinality as usize),
         points,
-        order
+        order,
     }
 }
 
