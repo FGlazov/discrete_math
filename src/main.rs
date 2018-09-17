@@ -1,4 +1,6 @@
+use std::time::Instant;
 use std::collections::HashSet;
+
 
 const ORDER: usize = 6;
 
@@ -15,7 +17,8 @@ fn main() {
     // in both squares, and then permeate the rows of both squares until the first square is in reduced form.
 
     for reduced_square in &reduced_latin_squares {
-        println!("Starting square");
+        let start = Instant::now();
+
         for semi_reduced_square in &reduced_latin_squares {
             let mut base = semi_reduced_square.entries.clone();
 
@@ -25,6 +28,9 @@ fn main() {
                 return;
             }
         }
+
+        let end = Instant::now();
+        println!("One iteration done in {:?}. ", (end - start) )
     }
 }
 
