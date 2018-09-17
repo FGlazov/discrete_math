@@ -2,17 +2,60 @@ use std::collections::HashSet;
 
 const ORDER: usize = 6;
 
-fn main() {
-    println!("{:?}", generate_all_reduced_latin_squares().len());
 
-//    let first_entries = [[1, 2, 4], [2, 4, 1], [4, 1, 2]];
-//    let second_entries = [[1, 2, 4], [4, 1, 2], [2, 4, 1]];
-//
-//    let first_latin_square = LatinSquare { entries: first_entries };
-//    let second_latin_square = LatinSquare { entries: second_entries };
-//
-//    println!("{}", first_latin_square.orthogonal_to(second_latin_square));
+// This is a computational "proof" that there is no projective plane of order 6.
+// We do this by showing that there are no two pairwise orthogonal latin squares of order 6.
+// Our alphabet consists of 1, 2, 4, 8, 16, 32 - in order to be able to make optimizations using bit masks.
+fn main() {
+    let reduced_latin_squares = generate_all_reduced_latin_squares();
+
+    // We Assume that the first square is in reduced form.
+    // And the second is in semi-reduced form (i.e. the first row is 1,2,4,8,16,32 but the column can be anything)
+    // This can be assumed w.l.o.g., since otherwise you can rename the symbols s.t. the first row is 1,2,4,8,16,32
+    // in both squares, and then permeate the rows of both squares until the first square is in reduced form.
+
+    for reduced_square in &reduced_latin_squares {
+        println!("Starting square");
+        for semi_reduced_square in &reduced_latin_squares {
+            let mut base = semi_reduced_square.entries.clone();
+
+            let found = generate_semi_reduced_and_orth_check(ORDER, &mut base, &reduced_square);
+            if found {
+                println!("Found orthogonal squares!");
+                return;
+            }
+        }
+    }
 }
+
+fn generate_semi_reduced_and_orth_check(n: usize, semi_reduced_square: &mut [[u16; ORDER]; ORDER], reduced_square: &LatinSquare) -> bool {
+    if n == 1 {
+        let latin_semi_reduced = LatinSquare { entries: semi_reduced_square.clone() };
+        let result = reduced_square.orthogonal_to(latin_semi_reduced);
+        return result;
+    } else {
+        let mut result = false;
+        for i in 0..n - 1 {
+            result = result || generate_semi_reduced_and_orth_check(n - 1, semi_reduced_square, reduced_square);
+            if n % 2 == 0 {
+                let first_value = semi_reduced_square[i];
+                let second_value = semi_reduced_square[n-1];
+
+                semi_reduced_square[n-1] = first_value;
+                semi_reduced_square[i] = second_value;
+            } else {
+                let first_value = semi_reduced_square[0];
+                let second_value = semi_reduced_square[n-1];
+
+                semi_reduced_square[n-1] = first_value;
+                semi_reduced_square[0] = second_value;
+            }
+        }
+        result = result || generate_semi_reduced_and_orth_check(n-1, semi_reduced_square, reduced_square);
+        return result;
+    }
+}
+
 
 fn generate_all_reduced_latin_squares() -> HashSet<LatinSquare> {
     // We start with the Square
@@ -62,12 +105,13 @@ fn generate_next_values(current_square: [[u16; ORDER]; ORDER]) -> HashSet<LatinS
                 result.insert(LatinSquare { entries: current_square });
                 return result;
 
-            // There is a 0 - but it doesn't have any valid values. It can't be extended to a latin square.
+                // There is a 0 - but it doesn't have any valid values. It can't be extended to a latin square.
             } else {
                 return HashSet::with_capacity(0);
             }
         }
-    }}
+    }
+}
 
 fn get_bits(bit_mask: u16) -> HashSet<u16> {
     let mut result = HashSet::with_capacity(ORDER - 1);
