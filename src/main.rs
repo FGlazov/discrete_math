@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 
-const ORDER: usize = 3;
+const ORDER: usize = 6;
 
 fn main() {
-    generate_all_reduced_latin_squares();
+    println!("{:?}", generate_all_reduced_latin_squares().len());
 
 //    let first_entries = [[1, 2, 4], [2, 4, 1], [4, 1, 2]];
 //    let second_entries = [[1, 2, 4], [4, 1, 2], [2, 4, 1]];
@@ -31,10 +31,51 @@ fn generate_all_reduced_latin_squares() -> HashSet<LatinSquare> {
         base[i][0] = 1 << (i as u16);
     }
 
-    println!("{:?}", get_next_allowed(&base));
+    generate_next_values(base)
+}
 
+fn generate_next_values(current_square: [[u16; ORDER]; ORDER]) -> HashSet<LatinSquare> {
+    // Find the next 0.
+    match get_next_allowed(&current_square) {
 
-    HashSet::new()
+        // We found the next 0 and its allowed values.
+        Ok(allowed_values) => {
+            let mut result = HashSet::new();
+
+            // Use every allowed value, and then start again with the next zero.
+            for bit in get_bits(allowed_values.allowed) {
+                let mut extended_square = current_square.clone();
+                extended_square[allowed_values.x][allowed_values.y] = bit;
+
+                for latin_square in generate_next_values(extended_square) {
+                    result.insert(latin_square);
+                }
+            }
+
+            return result;
+        }
+
+        Err(latin_square) => {
+            // There are no more 0s - we built a latin square.
+            if latin_square {
+                let mut result = HashSet::with_capacity(1);
+                result.insert(LatinSquare { entries: current_square });
+                return result;
+
+            // There is a 0 - but it doesn't have any valid values. It can't be extended to a latin square.
+            } else {
+                return HashSet::with_capacity(0);
+            }
+        }
+    }}
+
+fn get_bits(bit_mask: u16) -> HashSet<u16> {
+    let mut result = HashSet::with_capacity(ORDER - 1);
+    for i in 0..ORDER {
+        result.insert((1 << i) & bit_mask);
+    }
+    result.remove(&0);
+    result
 }
 
 // Returns AllowedValues if there is a 0 inside the square and it can take values.
@@ -47,7 +88,7 @@ fn get_next_allowed(current_square: &[[u16; ORDER]; ORDER]) -> Result<AllowedVal
         Some((x, y)) => {
             // Assume all are allowed to begin with
             let mut allowed_values = (1 << (ORDER)) - 1;
-            
+
             // And then remove all the values already taken in that row and column
             for i in 0..ORDER {
                 allowed_values = allowed_values & !current_square[x][i];
@@ -83,7 +124,7 @@ struct AllowedValues {
 }
 
 
-#[derive(Eq, PartialEq, Hash)]
+#[derive(Eq, PartialEq, Hash, Debug)]
 struct LatinSquare {
     entries: [[u16; ORDER]; ORDER]
 }
