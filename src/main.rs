@@ -1,6 +1,5 @@
-use std::time::Instant;
 use std::collections::HashSet;
-
+use std::{thread, time};
 
 const ORDER: usize = 6;
 
@@ -16,22 +15,42 @@ fn main() {
     // This can be assumed w.l.o.g., since otherwise you can rename the symbols s.t. the first row is 1,2,4,8,16,32
     // in both squares, and then permeate the rows of both squares until the first square is in reduced form.
 
-    for reduced_square in &reduced_latin_squares {
-        let start = Instant::now();
+    let mut handles = Vec::with_capacity(8);
 
-        for semi_reduced_square in &reduced_latin_squares {
+    for chunk in reduced_latin_squares.chunks(reduced_latin_squares.len() / 8) {
+        let chunk_for_thread = chunk.clone().to_vec();
+        let handle = thread::spawn(move || {
+            check_chunk(&chunk_for_thread);
+        });
+
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("All done!");
+
+    thread::sleep(time::Duration::from_secs(100000));
+
+}
+
+fn check_chunk(chunk : &Vec<LatinSquare>) {
+    for reduced_square in chunk {
+
+        for semi_reduced_square in chunk {
             let mut base = semi_reduced_square.entries.clone();
 
             let found = generate_semi_reduced_and_orth_check(ORDER, &mut base, &reduced_square);
             if found {
-                println!("Found orthogonal squares!");
+                println!("Thread done, we found orthogonal squares!");
                 return;
             }
         }
 
-        let end = Instant::now();
-        println!("One iteration done in {:?}. ", (end - start) )
     }
+    println!("Thread done with no orthogonal squares.")
 }
 
 fn generate_semi_reduced_and_orth_check(n: usize, semi_reduced_square: &mut [[u16; ORDER]; ORDER], reduced_square: &LatinSquare) -> bool {
@@ -45,25 +64,25 @@ fn generate_semi_reduced_and_orth_check(n: usize, semi_reduced_square: &mut [[u1
             result = result || generate_semi_reduced_and_orth_check(n - 1, semi_reduced_square, reduced_square);
             if n % 2 == 0 {
                 let first_value = semi_reduced_square[i];
-                let second_value = semi_reduced_square[n-1];
+                let second_value = semi_reduced_square[n - 1];
 
-                semi_reduced_square[n-1] = first_value;
+                semi_reduced_square[n - 1] = first_value;
                 semi_reduced_square[i] = second_value;
             } else {
                 let first_value = semi_reduced_square[0];
-                let second_value = semi_reduced_square[n-1];
+                let second_value = semi_reduced_square[n - 1];
 
-                semi_reduced_square[n-1] = first_value;
+                semi_reduced_square[n - 1] = first_value;
                 semi_reduced_square[0] = second_value;
             }
         }
-        result = result || generate_semi_reduced_and_orth_check(n-1, semi_reduced_square, reduced_square);
+        result = result || generate_semi_reduced_and_orth_check(n - 1, semi_reduced_square, reduced_square);
         return result;
     }
 }
 
 
-fn generate_all_reduced_latin_squares() -> HashSet<LatinSquare> {
+fn generate_all_reduced_latin_squares() -> Vec<LatinSquare> {
     // We start with the Square
 
     //  [  1      2 4 ... 2^ORDER]
@@ -83,13 +102,13 @@ fn generate_all_reduced_latin_squares() -> HashSet<LatinSquare> {
     generate_next_values(base)
 }
 
-fn generate_next_values(current_square: [[u16; ORDER]; ORDER]) -> HashSet<LatinSquare> {
+fn generate_next_values(current_square: [[u16; ORDER]; ORDER]) -> Vec<LatinSquare> {
     // Find the next 0.
     match get_next_allowed(&current_square) {
 
         // We found the next 0 and its allowed values.
         Ok(allowed_values) => {
-            let mut result = HashSet::new();
+            let mut result = Vec::new();
 
             // Use every allowed value, and then start again with the next zero.
             for bit in get_bits(allowed_values.allowed) {
@@ -97,7 +116,7 @@ fn generate_next_values(current_square: [[u16; ORDER]; ORDER]) -> HashSet<LatinS
                 extended_square[allowed_values.x][allowed_values.y] = bit;
 
                 for latin_square in generate_next_values(extended_square) {
-                    result.insert(latin_square);
+                    result.push(latin_square);
                 }
             }
 
@@ -107,13 +126,13 @@ fn generate_next_values(current_square: [[u16; ORDER]; ORDER]) -> HashSet<LatinS
         Err(latin_square) => {
             // There are no more 0s - we built a latin square.
             if latin_square {
-                let mut result = HashSet::with_capacity(1);
-                result.insert(LatinSquare { entries: current_square });
+                let mut result = Vec::with_capacity(1);
+                result.push(LatinSquare { entries: current_square });
                 return result;
 
                 // There is a 0 - but it doesn't have any valid values. It can't be extended to a latin square.
             } else {
-                return HashSet::with_capacity(0);
+                return Vec::with_capacity(0);
             }
         }
     }
@@ -174,7 +193,7 @@ struct AllowedValues {
 }
 
 
-#[derive(Eq, PartialEq, Hash, Debug)]
+#[derive(Eq, PartialEq, Hash, Debug, Clone)]
 struct LatinSquare {
     entries: [[u16; ORDER]; ORDER]
 }
